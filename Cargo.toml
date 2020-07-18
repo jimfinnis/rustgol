@@ -1,0 +1,9 @@
+[package]
+name = "gol"
+version = "0.1.0"
+authors = ["Jim Finnis <jim.finnis@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sdl2 = "^0.32"
+rand = "^0.7.3"
