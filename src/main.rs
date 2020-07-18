@@ -67,7 +67,8 @@ impl Grid {
         self.grid[((x+SIZE)%SIZE) as usize][((y+SIZE)%SIZE) as usize] = v;
     }
     
-    // a simple printing show.
+    // this uses the canvas (which is a generic, here it's a canvas
+    // on a window) and draws the grid to it.
     fn render(&self, canvas: &mut Canvas<Window>){
         canvas.set_draw_color(Color::RGB(255,255,0));
         for y in 0..SIZE {
@@ -86,6 +87,9 @@ impl Grid {
 // run a generation of Life, using neighbours() (which reads the front
 // buffer) and set() (which writes the back buffer). Note the heavy
 // use of match expressions.
+// This version takes a grid and produces a new grid. There are, I suppose,
+// a few ways to do this, but doing traditional pointer-swap double
+// buffering seems quite hard in Rust.
 
 fn gen(g: Grid) -> Grid {
     let mut ng = Grid::new();
@@ -111,11 +115,14 @@ fn gen(g: Grid) -> Grid {
 }
 
 fn main() {
+    // create a mutable grid
     let mut g = Grid::new();
     // create a new standard PRNG, using OS entropy to get a 
     // new seed every time
     let mut r = StdRng::from_entropy();
     
+    // initialise video: note the use ofunwrap(), which unwraps a
+    // Result - unless it's an error, where it panics.
     let sdl_c = sdl2::init().unwrap();
     let video = sdl_c.video().unwrap();
     let window = video.window("Foo",WIDTH,WIDTH)
@@ -126,13 +133,15 @@ fn main() {
           .present_vsync()
           .build().unwrap();
     
+    // clear the canvas and present it
     canvas.set_draw_color(Color::RGB(0,0,0));
     canvas.clear();
     canvas.present();
     
+    // get an event pump
     let mut event_pump = sdl_c.event_pump().unwrap();
     
-    
+    // fill the grid with some randomness. Note the dummy variable _.
     for _ in 0..10000 {
         // get random number in range. We have to specify the type
         // so we know which implementation of gen_range() to use.
@@ -141,23 +150,35 @@ fn main() {
         g.set(x,y,true);
     }
     
-    // run some generations - swap, gen, show.
+    // run some generations forever
     'mainloop: loop {
-        canvas.set_draw_color(Color::RGB(0,0,0));
-        canvas.clear();
+        // process any events. Some clever pattern matching here,
+        // in that events are structures we match on. In the case
+        // of Quit we don't care what's inside; in the case of
+        // keycodes we do. So this says quitting is either a Quit
+        // with anything in it, or a KeyDown with an Escape (wrapped
+        // in an Option by the Some "variant" of Option) (Option is
+        // an algebraic data type), or similarly a Q key.
         for e in event_pump.poll_iter() {
             match e {
                 Event::Quit {..} |
                 Event::KeyDown {keycode: Some(Keycode::Escape),..}|
-                      Event::KeyDown {keycode: Some(Keycode::Q),..}
+                Event::KeyDown {keycode: Some(Keycode::Q),..}
                 => {
+                    // in the quit case, break out of the loop
                     break 'mainloop;
-                },
+                   },
+                   // otherwise do nothing.
                 _ => {}
              }
         }
 
+        // clear the canvas
+        canvas.set_draw_color(Color::RGB(0,0,0));
+        canvas.clear();
+        // create a new grid from the old one
         g = gen(g);
+        // draw and present it, and then pause for 1/60s.
         g.render(&mut canvas);
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
